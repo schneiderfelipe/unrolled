@@ -10,19 +10,13 @@ func map(parent: NimNode, f: NimNode -> NimNode): NimNode =
     result[i] = map(child, f)
 
 
-macro unroll*(forLoop: untyped): auto =
-  # TODO: if we get a StmtList, find all for-loops and unroll them.
-  forLoop.expectKind nnkForStmt
+# A recipe for making unroll to work with arrays:
+# debugEcho treeRepr over  # => Call(Sym "items", Sym "args")
+# debugEcho treeRepr getType over[1]  # => BracketExpr(Sym "array", BracketExpr(Sym "range", IntLit 0, IntLit 2))
+# The above will have to be called in an external typed macro and stored here in a quote do
 
-  let
-    index = forLoop[0] # The variable we're looping over
-    over = forLoop[1]  # The range we're looping over
-    body = forLoop[2]  # The loop body
 
-    start = over[1].intVal
-    stop = over[2].intVal
-    unrolledLoop = newStmtList()
-
+func unrollForSlice(index, over, body: NimNode): NimNode =
   # We make sure it's something like `1..10`
   # TODO: support unrolling based on types (arrays, tuples, etc.)
   over.expectKind nnkInfix
@@ -30,10 +24,15 @@ macro unroll*(forLoop: untyped): auto =
   over[1].expectKind nnkIntLit
   over[2].expectKind nnkIntLit
 
+  result = newStmtList()
+  let
+    start = over[1].intVal
+    stop = over[2].intVal
   var modBody: NimNode
+
   for i in start..stop:
     # Substitute all occurences of `index` for literal values...
-    modBody = map(body) do (node: NimNode) -> NimNode:
+    modBody = body.map do (node: NimNode) -> NimNode:
       if node == index:
         quote do:
           `i`
@@ -41,18 +40,33 @@ macro unroll*(forLoop: untyped): auto =
         node
 
     # ... then insert `modBody` in place of `body` in its own `block`
-    unrolledLoop.add quote do:
+    result.add quote do:
       block:
         `modBody`
 
+
+func unrollFor(loop: NimNode): NimNode =
+  # TODO: if we get a StmtList, find all for-loops and unroll them.
+  loop.expectKind nnkForStmt
+
+  let unrolledLoop = unrollForSlice(
+    loop[0],  # The variable we're looping over
+    loop[1],  # The range we're looping over
+    loop[2],  # The loop body
+  )
+
   # TODO: can we safely remove the compilation test?
   result = quote do:
-    when compiles(`forLoop`):
+    when compiles(`loop`):
       `unrolledLoop`
     else:
-      `forLoop`
+      `loop`
 
+
+macro unroll*(forLoop: untyped): auto =
+  result = unrollFor(forLoop)
   # debugEcho treeRepr result
+
 
 when isMainModule:
   expandMacros:
@@ -61,9 +75,14 @@ when isMainModule:
       total += i
     echo total
 
-  var x: int
   expandMacros:
+    var x: int
     unroll for i in 1..3:
       var j = i + 1
       x += j
     echo x
+
+  # let args = [1, 2, 3]
+  # expandMacros:
+  #   unroll for i in args:
+  #     echo $i

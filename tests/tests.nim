@@ -11,6 +11,13 @@ suite "For-loops over slices":
         total += i
     check total == 1 + 2 + 3
 
+  test "unroll works over slices such as 1.<3":
+    expandMacros:
+      var total: int
+      unroll for i in 1..<3:
+        total += i
+    check total == 1 + 2
+
   test "unroll works when variables are defined within the loop":
     expandMacros:
       var x: int

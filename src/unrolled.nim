@@ -5,9 +5,10 @@ import
 
 func map(parent: NimNode, f: NimNode -> NimNode): NimNode =
   ## Walk over a `NimNode` and return a (possibly) modified one.
-  result = f(parent).copy
+  result = parent.copy
   for i, child in parent:
     result[i] = map(child, f)
+  result = f(result)
 
 
 # A recipe for making unroll to work with arrays:
@@ -46,7 +47,6 @@ func unrollForSlice(index, over, body: NimNode): NimNode =
 
 
 func unrollFor(loop: NimNode): NimNode =
-  # TODO: if we get a StmtList, find all for-loops and unroll them.
   loop.expectKind nnkForStmt
 
   let unrolledLoop = unrollForSlice(
@@ -63,26 +63,55 @@ func unrollFor(loop: NimNode): NimNode =
       `loop`
 
 
-macro unroll*(forLoop: untyped): auto =
-  result = unrollFor(forLoop)
+func unrollAll(stmts: NimNode): NimNode =
+  stmts.expectKind nnkStmtList
+
+  result = stmts.map do (node: NimNode) -> NimNode:
+    if node.kind == nnkForStmt:
+      unrollFor(node)
+    else:
+      node
+
+
+macro unroll*(x: untyped): auto =
+  result = case x.kind:
+  of nnkForStmt:
+    unrollFor(x)
+  of nnkStmtList:
+    unrollAll(x)
+  else:
+    debugEcho "COULD NOT UNROLL"
+    x
   # debugEcho treeRepr result
 
 
 when isMainModule:
-  expandMacros:
-    var total: int
-    unroll for i in 1..3:
-      total += i
-    echo total
+  block:
+    # expandMacros:
+      var total: int
+      unroll for i in 1..3:
+        total += i
+      echo total
 
-  expandMacros:
-    var x: int
-    unroll for i in 1..3:
-      var j = i + 1
-      x += j
-    echo x
+  block:
+    # expandMacros:
+      var x: int
+      unroll for i in 1..3:
+        var j = i + 1
+        x += j
+      echo x
 
-  # let args = [1, 2, 3]
-  # expandMacros:
-  #   unroll for i in args:
-  #     echo $i
+  block:
+    expandMacros:
+      var total: int
+      unroll:
+        for i in 1..3:
+          for j in 1..3:
+            total += i + j
+      echo total
+
+  # block:
+  #   expandMacros:
+  #     let args = [1, 2, 3]
+  #     unroll for i in args:
+  #       echo $i

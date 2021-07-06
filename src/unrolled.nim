@@ -1,21 +1,27 @@
 import
   macros,
+  strformat,
   sugar
 
 
 func map(parent: NimNode, f: NimNode -> NimNode): NimNode =
   # Walk over a `NimNode` and return a (possibly) modified one.
-  result = parent.copy
-  for i, child in parent:
-    result[i] = map(child, f)
+  result = parent.copyNimNode
+  for child in parent:
+    result.add map(child, f)
   result = f(result)
+
+
+func isSlice(over: NimNode): bool =
+  # Test if a `NimNode` represents a slice.
+  over.kind == nnkInfix and
+  over[1].kind == nnkIntLit and
+  over[2].kind == nnkIntLit
 
 
 iterator staticItems(over: NimNode): auto =
   # Attempt to iterate over a `NimNode`.
-  over.expectKind nnkInfix
-  over[1].expectKind nnkIntLit
-  over[2].expectKind nnkIntLit
+  assert isSlice(over), &"not a slice '{repr over}'"
 
   let
     start = over[1].intVal
@@ -26,7 +32,7 @@ iterator staticItems(over: NimNode): auto =
   of "..<":
     for i in start..<stop: yield i
   else:
-    assert false
+    raise newException(ValueError, &"cannot not unroll loop over '{repr over}'")
 
 
 # A recipe for making unroll to work with arrays:
@@ -39,6 +45,8 @@ iterator staticItems(over: NimNode): auto =
 
 func unrollForSlice(index, over, body: NimNode): NimNode =
   # Unroll something like `for i in 1..10: ...` or `for i in 1..<10: ...`.
+  assert isSlice(over), &"not a slice '{repr over}'"
+
   result = newStmtList()
 
   var modBody: NimNode
@@ -61,11 +69,15 @@ func unrollFor(loop: NimNode): NimNode =
   # Unroll for-loops in general.
   loop.expectKind nnkForStmt
 
-  let unrolledLoop = unrollForSlice(
-    loop[0],  # The variable we're looping over
-    loop[1],  # The range we're looping over
-    loop[2],  # The loop body
-  )
+  var unrolledLoop: NimNode
+  if isSlice(loop[1]):
+    unrolledLoop = unrollForSlice(
+      loop[0],  # The variable we're looping over
+      loop[1],  # The range we're looping over
+      loop[2],  # The loop body
+    )
+  else:
+    raise newException(ValueError, &"cannot not unroll loop over '{repr loop[1]}'")
 
   # TODO: can we safely remove the compilation test?
   result = quote do:
@@ -86,7 +98,7 @@ func unrollAll(stmts: NimNode): NimNode =
       node
 
 
-macro unroll*(x: untyped): auto =
+macro unroll*(x: untyped): untyped =
   ## Unroll for-loops.
   result = case x.kind:
   of nnkForStmt:
@@ -94,26 +106,30 @@ macro unroll*(x: untyped): auto =
   of nnkStmtList:
     unrollAll(x)
   else:
-    debugEcho "COULD NOT UNROLL"
-    assert false
-    x
+    raise newException(ValueError, &"cannot not unroll loop '{repr x}'")
   # debugEcho treeRepr result
 
 
 when isMainModule:
-  block:
-    expandMacros:
-      var total: int
-      unroll for i in 1..<4:
-        total += i
-      echo total
-
   block:
     var x: int
     unroll for i in 1..3:
       var j = i + 1
       x += j
     echo x
+
+  block:
+    var total: int
+    unroll for i in 1..<4:
+      total += i
+    echo total
+
+  block:
+    var total: int
+    for i in 1..3:
+      unroll for j in 1..3:
+        total += i + j
+    echo total
 
   block:
     var total: int
@@ -125,6 +141,12 @@ when isMainModule:
 
   # block:
   #   expandMacros:
-  #     let args = [1, 2, 3]
-  #     unroll for i in args:
-  #       echo $i
+  #     var cats: string
+  #     unroll for cat in ("Sandy", "Junior", "Chamuscado").fields:
+  #       cats &= cat & ", "
+  #     echo cats
+
+  # block:
+  #   let args = [1, 2, 3]
+  #   unroll for i in args:
+  #     echo $i

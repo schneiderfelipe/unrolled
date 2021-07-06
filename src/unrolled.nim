@@ -1,7 +1,17 @@
-import macros
+import
+  macros,
+  sugar
+
+
+func map(parent: NimNode, f: NimNode -> NimNode): NimNode =
+  ## Walk over a `NimNode` and return a (possibly) modified one.
+  result = f(parent).copy
+  for i, child in parent:
+    result[i] = map(child, f)
+
 
 macro unroll*(forLoop: untyped): auto =
-  # TODO: if we get a StmtList, find all for loops and apply macro
+  # TODO: if we get a StmtList, find all for-loops and unroll them.
   forLoop.expectKind nnkForStmt
 
   let
@@ -20,12 +30,20 @@ macro unroll*(forLoop: untyped): auto =
   over[1].expectKind nnkIntLit
   over[2].expectKind nnkIntLit
 
-  # TODO: substitute values into the body
+  var modBody: NimNode
   for i in start..stop:
+    # Substitute all occurences of `index` for literal values...
+    modBody = map(body) do (node: NimNode) -> NimNode:
+      if node == index:
+        quote do:
+          `i`
+      else:
+        node
+
+    # ... then insert `modBody` in place of `body` in its own `block`
     unrolledLoop.add quote do:
       block:
-        let `index` = `i`
-        `body`
+        `modBody`
 
   # TODO: can we safely remove the compilation test?
   result = quote do:
@@ -42,3 +60,10 @@ when isMainModule:
     unroll for i in 1..3:
       total += i
     echo total
+
+  var x: int
+  expandMacros:
+    unroll for i in 1..3:
+      var j = i + 1
+      x += j
+    echo x

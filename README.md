@@ -9,21 +9,20 @@ unroll for i in 1..3:
 echo total
 ```
 
-The above actually executes the following
+The above actually executes the following (see with [`expandMacros`](https://nim-lang.org/docs/macros.html#expandMacros.m%2Ctyped))
 
 ```nim
 var total: int
 block:
-  let i = 1
-  total += i
+  total += 1
 block:
-  let i = 2
-  total += i
+  total += 2
 block:
-  let i = 3
-  total += i
-echo [total]
+  total += 3
+echo total
 ```
+
+(The usage of `block`s ensure variables never "leak".)
 
 ## Other projects
 

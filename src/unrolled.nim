@@ -116,6 +116,12 @@ func unrollAll(stmts: NimNode): NimNode =
 
 macro unroll*(x: typed): auto =
   ## Unroll for-loops.
+  runnableExamples:
+    var total: int
+    unroll for i in 1..3:
+      total += i
+    assert total == 1 + 2 + 3
+
   result = case x.kind:
   of nnkForStmt:
     unrollFor(x)

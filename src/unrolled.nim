@@ -96,9 +96,9 @@ func unrollFor(loop: NimNode): NimNode =
   # Unroll for-loops in general.
   loop.expectKind nnkForStmt
   result = unrollForImpl(
-    loop[0],  # The variable we're looping over
-    loop[1],  # The range we're looping over
-    loop[2],  # The loop body
+    loop[0], # The variable we're looping over
+    loop[1], # The range we're looping over
+    loop[2], # The loop body
   )
   # debugEcho treeRepr result
 

@@ -1,6 +1,6 @@
 import
   unittest,
-  macros,  # for eyeballing `expandMacros` results
+  macros, # for eyeballing `expandMacros` results
   unrolled
 
 suite "Simple for-loops over slices":

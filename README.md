@@ -27,6 +27,12 @@ one regarding variable definitions in the loop body (see [#1](https://github.com
 one about nested loops (see [#2](https://github.com/schneiderfelipe/unrolled/issues/2)).
 I expect to solve them some time soon.
 
+## Installation
+
+unrolled supports Nim 1.0.0+ and can be installed using [Nimble](https://github.com/nim-lang/Nimble):
+
+    $ nimble install unrolled
+
 ## Other projects
 
 - [Unrolled.jl](https://github.com/cstjean/Unrolled.jl) (Julia)

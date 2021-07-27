@@ -1,3 +1,7 @@
+**WARNING**: this project has been retired.
+For a Rust-based alternative, see
+[crunchy](https://crates.io/crates/crunchy).
+
 # unrolled
 
 Unroll for-loops at compile-time.
